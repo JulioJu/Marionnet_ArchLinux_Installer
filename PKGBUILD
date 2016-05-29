@@ -1,18 +1,12 @@
 # Contributor: JulioJu  < juanes  0890  at google mail dot com >
 # Maintainer : JulioJu  < juanes  0890  at google mail dot com >
 
-# Inspirated from :
-# http://bazaar.launchpad.net/~marionnet-drivers/marionnet/trunk/view/head:/useful-scripts/marionnet_from_scratch
-# Copyright (C) 2010 2011 2012 2013  Jean-Vincent Loddo Copyright (C) 2010
-# 2011 2012 2013  Université Paris 13 
-# (LGPL)
-
-pkgname=('marionnet-trunk')
-pkgver=1
+pkgname=('marionnet')
+pkgver=0.90.6
 pkgrel=2
 pkgdesc="Educational software. It is a virtual network laboratory: it allows
 users to define, configure and run complex computer networks without any need
-for physical setup. Trunk version (with UML kernel Debian Wheezy)."
+for physical setup. Very old version."
 arch=('i686' 'x86_64')
 url="https://www.marionnet.org/"
 makedepends=('bc' 'optipng')
@@ -22,26 +16,26 @@ if test "$CARCH" == x86_64; then
   depends+=('lib32-glibc')
 fi
 # Not depends of camlp4 and ocaml-findlib.
-conflicts=('marionnet')
-source=("http://caml.inria.fr/pub/distrib/ocaml-3.12/ocaml-3.12.1.tar.gz"
+conflicts=('marionnet-trunk')
+source=("http://caml.inria.fr/distrib/ocaml-3.11/ocaml-3.11.2.tar.gz"
         'http://wwwfun.kurims.kyoto-u.ac.jp/soft/lsl/dist/lablgtk-2.14.2.tar.gz'
-        "https://www.marionnet.org/download/marionnet_from_scratch/mirror/ocamlbricks-trunk.tar.gz"
-        "https://www.marionnet.org/download/marionnet_from_scratch/mirror/marionnet-trunk.tar.gz"
-        "https://raw.githubusercontent.com/JulioJu/Marionnet_ArchLinux_Installer/master/Makefile-trunk.patch"
+        "https://www.marionnet.org/download/marionnet_from_scratch/mirror/ocamlbricks-0.90.3.tar.gz"
+        "https://www.marionnet.org/download/marionnet_from_scratch/mirror/marionnet-0.90.6.tar.gz"
+        "https://raw.githubusercontent.com/JulioJu/Marionnet_ArchLinux_Installer/master/Makefile-legacy.patch"
         "https://raw.githubusercontent.com/JulioJu/Marionnet_ArchLinux_Installer/master/marionnet_from_scratch-Downloader"
 )
-sha256sums=('4f81ab86258be0eea1507dd5338c8670490f8616249821e731f8ac1c64caa4a7'
+sha256sums=('83008744c0ba1e3460651b86d0900916edae38813eb9a0300e8eaa861c3e921e'
             '4981abedabdc462303f345104042c88af227ccd50fd30a9bf48fd353ab02d0ba'
-            '646b6de59a555b2e41960708cf4edfed571d88369d850a50e23bf4a4b17ed329'
-            '610c806e595be4d56ff6cded02e8d8a3091fe211487073c02ddb5132c3b4ffb6'
-            'efb09389cc67a88b16509dec3ca3fb32f1da1f4c5808b8f2e7e2f050376bf691'
+            '39cc4cc100124b8363c9760494d7e285803ca22ff8409f79038f3fb4a146a96c'
+            '3a571a2cb4724b50eb52e33191d42a6b8396889e728bc974bc396395c9ce03ac'
+            '1fd697ff5f7055bcd6da2b6b5233d58bf79a2d4fc59b36eb79fb3c0d63265d3c'
             '5d8ddf6e5c5b726e892bae2b55eb5eb01f43bd47fa2855ec38797d0598a6ea24')
-install=marionnet-trunk.install
+install=marionnet-legacy.install
 
 # ################
 # MAKEDEPENDS : CREATED DURING COMPILATION but not keep
 # pkgname=ocaml
-# pkgver=3.12.1
+# pkgver=3.11.2
 # Do not use older package (see :
 # https://bugs.launchpad.net/marionnet/+bug/1580349 )
 # pkgdesc="A functional language with OO extensions"
@@ -66,16 +60,37 @@ build () {
     OUR_MIRROR="https://www.marionnet.org/download/marionnet_from_scratch/mirror/"
     PREFIX="${srcdir}/usr/local"
     mkdir -p "${PREFIX}/usr/local"
-    OCAML_DIR="${srcdir}/ocaml-3.12.1"
+    OCAML_DIR="${srcdir}/ocaml-3.11.2"
     LABLGTK2_DIR="${srcdir}/lablgtk-2.14.2"
-    MARIONNET_DIR="${srcdir}/marionnet"
-    OCAMLBRICK_DIR="${srcdir}/ocamlbricks"
+    MARIONNET_DIR="${srcdir}/marionnet-0.90.6"
+    OCAMLBRICK_DIR="${srcdir}/ocamlbricks-0.90.3"
     export PATH="${PREFIX}/bin:${PATH}"
     LIB_OCAML="${PREFIX}/lib/ocaml/"
 
     ### OCAML ###
 
     cd "${OCAML_DIR}"
+
+    # Download and apply the patch bugfix-5237.diff for ocaml 3.11 on a 64 bits architecture
+    if type uname 1>&2 && [[ $(uname -m) = "${CARCH}" ]]; then
+        local BUGFIX_FILE="bugfix-5237.diff"
+        echo "Downloading the ocaml 3.11 patch ($BUGFIX_FILE) for ${CARCH}"
+        curl -L -o $BUGFIX_FILE "$OUR_MIRROR/$BUGFIX_FILE" || \
+            curl -L -o $BUGFIX_FILE 'http://caml.inria.fr/mantis/file_download.php?file_id=415&type=bug' || \
+            return 1
+        echo "Applying the ocaml 3.11 patch ($BUGFIX_FILE) for ${CARCH}"
+        patch -p1 < $BUGFIX_FILE
+        # Download and apply the patch 0007-Fix-ocamlopt-w.r.t.-binutils-2.2[1-9].patch
+        # for ocaml 3.11 on a 32 bits architecture with binutils version=2.2[1-9].x
+    elif type ld 1>&2 && ld -v | \grep -q '[ ]2[.]2[1-9]'; then
+        local BUGFIX_FILE="bugfix-5237-i386.diff"
+        echo "Downloading the ocaml 3.11 patch ($BUGFIX_FILE) for i386"
+        curl -L -o $BUGFIX_FILE "$OUR_MIRROR/$BUGFIX_FILE" || \
+            curl -L -o $BUGFIX_FILE 'http://caml.inria.fr/mantis/file_download.php?file_id=418&type=bug' || \
+            return 1
+        echo "Applying the ocaml 3.11 patch ($BUGFIX_FILE) for i386"
+        patch -p1 < $BUGFIX_FILE
+    fi
 
     ./configure -prefix "${PREFIX}" -no-curses -no-tk
     make world.opt &&
@@ -116,14 +131,15 @@ EOF
     make clean &&
     make &&
     make install
-    ############ MARIONNET ###########
+
+    ############# MARIONNET ###########
 
 
     cd "${MARIONNET_DIR}"
 
     # Makefile patch 
 
-    patch Makefile < ../Makefile-trunk.patch
+    patch Makefile < ../Makefile-legacy.patch
 
     # Configure CONFIGME
 cat > CONFIGME <<EOF
@@ -146,7 +162,7 @@ package() {
 
     # Fakeroot, so redifine them.
     PREFIX="${srcdir}/usr/local"
-    MARIONNET_DIR="${srcdir}/marionnet"
+    MARIONNET_DIR="${srcdir}/marionnet-0.90.6"
     export PATH="${PREFIX}/bin:${PATH}"
 
     cd ${MARIONNET_DIR}
@@ -234,7 +250,7 @@ EOF
 
     chmod u+x "${srcdir}/marionnet_from_scratch-Downloader"
     cp -L "${srcdir}/marionnet_from_scratch-Downloader" "${pkgdir}/usr/share/marionnet"
-    echo -e "0\ntrunk" > "${pkgdir}/usr/share/marionnet/numberOfStepsPassedForDownloadMarionnetFilesystems.tmp"
+    echo -e "0\n0.90" > "${pkgdir}/usr/share/marionnet/numberOfStepsPassedForDownloadMarionnetFilesystems.tmp"
 
 }
 
